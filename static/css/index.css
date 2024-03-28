@@ -1,78 +1,81 @@
 .tooltip {
-    position: absolute;
-    padding: 10px;
-    background-color: white;
-    border: 1px solid black;
-    opacity: 0;
-    pointer-events: none;
+  opacity: 0;
+  position: absolute;
+  padding: 10px;
+  background: rgba(255, 255, 255, 0.8);
+  border: 1px solid #ccc;
+  border-radius: 5px;
+  pointer-events: none;
+  z-index: 10;
 }
 
 .ui-slider .ui-slider-range {
-    background: #198754;
+  background: #198754;
 }
 .slider .ui-slider-handle {
-    background-color: #fff;
-    border: 1px solid #ccc;
+  background-color: #fff;
+  border: 1px solid #ccc;
 }
 
-.slider .ui-slider-handle:hover, .slider .ui-slider-handle:active {
-    background-color: #198754;
-    border-color: #198754;
+.slider .ui-slider-handle:hover,
+.slider .ui-slider-handle:active {
+  background-color: #198754;
+  border-color: #198754;
 }
 
 .slider.ui-slider-horizontal {
-    background: #f9fff9;
-    top: -0.15em;
+  background: #f9fff9;
+  top: -0.15em;
 }
 
 .movie img {
-    width: 115px;
-    height: auto;
+  width: 115px;
+  height: auto;
 }
 .movie h2 {
-    font-size: 16px;
-    font-weight: bold;
+  font-size: 16px;
+  font-weight: bold;
 }
 
 .ui-slider-handle {
-    transition: width 200ms ease;
-    color: #fff;
+  transition: width 200ms ease;
+  color: #fff;
 }
 
-.ui-slider-handle:active{
-    border: none;
-    border-radius: 10%;
-    color: #fff;
-    font-size: 12px;
-    height: 17px;
-    line-height: 20px;
-    text-align: center;
-    width: 25px;
+.ui-slider-handle:active {
+  border: none;
+  border-radius: 10%;
+  color: #fff;
+  font-size: 12px;
+  height: 17px;
+  line-height: 20px;
+  text-align: center;
+  width: 25px;
 }
 
 .floating-button {
-    position: absolute;
-    top: 0;
-    right: 0;
-    padding: 8px 15px;
-    color: #FFF;
-    cursor: help !important;
-    font-size: 14px;
-    font-weight: bold;
+  position: absolute;
+  top: 0;
+  right: 0;
+  padding: 8px 15px;
+  color: #fff;
+  cursor: help !important;
+  font-size: 14px;
+  font-weight: bold;
 }
 
 .ui-dialog-titlebar-close:before {
-    content: 'X';
-    font-weight: bold;
-    font-size: 16px;
-    position: relative;
-    top: -5px;
+  content: "X";
+  font-weight: bold;
+  font-size: 16px;
+  position: relative;
+  top: -5px;
 }
 
 svg {
-    max-height: 35em;
+  max-height: 35em;
 }
 
 body {
-    overflow: hidden;
+  overflow: hidden;
 }

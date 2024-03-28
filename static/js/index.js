@@ -4,6 +4,7 @@ $(document).ready(function () {
   // Global variable that holds the original ratings for a given user that will be displayed if "Reset" button is clicked
   var originalRatings = [];
   var cluster_data = [];
+  var usersToCompare = [];
   var cluster_chart;
   var representativeDots;
   var nonRepresentativeDots;
@@ -71,41 +72,26 @@ $(document).ready(function () {
     $("#movie-row").removeClass("d-none");
   }
 
-  $("#userId").selectize({
-    create: false,
-    placeholder: "Enter ID between 1 - 6040",
-    allowEmptyOption: true,
-  });
+  // Refactored function to initialize selectize elements
+  function initializeSelectize(ids) {
+    ids.forEach((id) => {
+      $(`#${id}`).selectize({
+        create: false,
+        placeholder: "None",
+        allowEmptyOption: true,
+      });
+    });
+  }
 
-  $("#age").selectize({
-    create: false,
-    placeholder: "None",
-    allowEmptyOption: true,
-  });
-
-  $("#gender").selectize({
-    create: false,
-    placeholder: "None",
-    allowEmptyOption: true,
-  });
-
-  $("#location").selectize({
-    create: false,
-    placeholder: "None",
-    allowEmptyOption: true,
-  });
-
-  $("#occupation").selectize({
-    create: false,
-    placeholder: "None",
-    allowEmptyOption: true,
-  });
-
-  $("#top-genre").selectize({
-    create: false,
-    placeholder: "None",
-    allowEmptyOption: true,
-  });
+  // Call the refactored function with the IDs of elements
+  initializeSelectize([
+    "userId",
+    "age",
+    "gender",
+    "location",
+    "occupation",
+    "top-genre",
+  ]);
 
   createSliders(
     "50|50|50|50|50|50|50|50|50|50|50|50|50|50|50|50|50|50|50".split("|")
@@ -359,11 +345,6 @@ $(document).ready(function () {
     });
   }
 
-  async function fetchUserTooltip(userId) {
-    let userData = await fetchUser(userId);
-    return `<b>User: </b>${userId}<br><b>Gender: </b>${userData.gender}<br><b>Age: </b>${ageRange(userData.age)}<br><b>Occupation: </b>${occupations[userData.occupation]}<br><b>Location: </b>${userData.zipCode}`;
-  }
-
   async function addCounterfactualPersona(userId) {
     if ($("#user-" + userId).length) {
       return;
@@ -371,222 +352,188 @@ $(document).ready(function () {
     let user = await fetchUser(userId);
     let counterfactualPersonaHTML =
       `
-			<div class="col-sm-6">
-				<div class="card mb-3">
-					<div class="row card-body">
-						<div class="col-sm-4 text-center">
-							<img src="` +
+    	<div class="col-sm-6">
+    		<div class="card mb-3">
+    			<div class="row card-body">
+    				<div class="col-sm-4 text-center">
+    					<img src="` +
       $("#avatarImage").attr("src") +
       `" class="img-fluid rounded-circle w-75">
-							<button class="btn btn-success btn-sm mt-2 movies-btn">Movies</button>
-							<button class="btn btn-danger btn-sm mt-2 delete-btn">Delete</button>
-						</div>
-						<div class="col-sm-8">
-							<h5 id="user-${userId}" class="card-title">User ${userId}</h5>
-							<p class="card-text">		
-								<b>Gender: </b>${user.gender}<br>
-								<b>Age: </b>${ageRange(user.age)}<br>
-								<b>Occupation: </b>${occupations[user.occupation]}<br>
-								<b>Location: </b>${user.zipCode}
-							</p>
-						</div>
-					</div>
-				</div>
-			</div>
-		`;
+    					<button class="btn btn-success btn-sm mt-2 movies-btn">Movies</button>
+    					<button class="btn btn-danger btn-sm mt-2 delete-btn">Delete</button>
+    				</div>
+    				<div class="col-sm-8">
+    					<h5 id="user-${userId}" class="card-title">User ${userId}</h5>
+    					<p class="card-text">
+    						<b>Gender: </b>${user.gender}<br>
+    						<b>Age: </b>${ageRange(user.age)}<br>
+    						<b>Occupation: </b>${occupations[user.occupation]}<br>
+    						<b>Location: </b>${user.zipCode}
+    					</p>
+    				</div>
+    			</div>
+    		</div>
+    	</div>
+    `;
     $("#counterfactual-personas").append(counterfactualPersonaHTML);
   }
 
+  function addUserToComparison(userId) {
+    if (usersToCompare.includes(userId)) {
+      usersToCompare = usersToCompare.filter((user) => user !== userId);
+    } else {
+      usersToCompare.push(userId);
+    }
+    console.log(usersToCompare);
+  }
+
+  async function fetchUserTooltip(userId) {
+    let userData = await fetchUser(userId);
+    return `<b>User: </b>${userId}<br><b>Gender: </b>${userData.gender}<br><b>Age: </b>${ageRange(userData.age)}<br><b>Occupation: </b>${occupations[userData.occupation]}<br><b>Location: </b>${userData.zipCode}`;
+  }
+
   function generate_cluster(data) {
-    // Zoomable, Pannable, Hoverable Scatter Plot
-    // Set height/width of plot
-    const height = $("#cluster-column").height();
-    const width = $("#cluster-column").width();
-    const k = height / width;
+    const { height, width, x, y, z } = createScales(data);
+    clearChartContainer();
+    const svg = setupChartSvg(width, height);
+    const tooltip = setupTooltip();
 
-    $("#chart").empty();
+    plotData(svg, data, x, y, z, tooltip);
+    setupZoom(svg, x, y, width, height);
 
-    grid = (g, x, y) =>
-      g
-        .attr("stroke", "currentColor")
-        .attr("stroke-opacity", 0.1)
-        .call((g) =>
-          g
-            .selectAll(".x")
-            .data(x.ticks(12))
-            .join(
-              (enter) =>
-                enter
-                  .append("line")
-                  .attr("class", "x")
-                  .attr("y2", height + 10),
-              (update) => update,
-              (exit) => exit.remove()
-            )
-            .attr("x1", (d) => 0.5 + x(d))
-            .attr("x2", (d) => 0.5 + x(d))
-        )
-        .call((g) =>
-          g
-            .selectAll(".y")
-            .data(y.ticks(12 * k))
-            .join(
-              (enter) =>
-                enter
-                  .append("line")
-                  .attr("class", "y")
-                  .attr("x2", width + 10),
-              (update) => update,
-              (exit) => exit.remove()
-            )
-            .attr("y1", (d) => 0.5 + y(d))
-            .attr("y2", (d) => 0.5 + y(d))
-        );
+    function createScales(data) {
+      const height = $("#cluster-column").height();
+      const width = $("#cluster-column").width();
+      const k = height / width;
+      const x = d3.scaleLinear().domain([-4.5, 4.5]).range([0, width]);
+      const y = d3
+        .scaleLinear()
+        .domain([-4.5 * k, 4.5 * k])
+        .range([height, 0]);
+      const z = d3
+        .scaleOrdinal()
+        .domain(data.map((d) => d[2]))
+        .range(d3.schemeCategory10);
+      return { height, width, x, y, z };
+    }
 
-    yAxis = (g, y) =>
-      g
-        .call(d3.axisRight(y).ticks(12 * k))
-        .call((g) => g.select(".domain").attr("display", "none"));
-    xAxis = (g, x) =>
-      g
-        .attr("transform", `translate(0,${height})`)
-        .call(d3.axisTop(x).ticks(12))
-        .call((g) => g.select(".domain").attr("display", "none"));
+    function clearChartContainer() {
+      $("#chart").empty();
+    }
 
-    const z = d3
-      .scaleOrdinal()
-      .domain(data.map((d) => d[2]))
-      .range(d3.schemeCategory10);
-    const y = d3
-      .scaleLinear()
-      .domain([-4.5 * k, 4.5 * k])
-      .range([height, 0]);
-    const x = d3.scaleLinear().domain([-4.5, 4.5]).range([0, width]);
+    function setupChartSvg(width, height) {
+      return d3.create("svg").attr("viewBox", [0, 0, width, height]);
+    }
 
-    const chart = () => {
-      const zoom = d3.zoom().scaleExtent([8, 128]).on("zoom", zoomed);
-      const svg = d3.create("svg").attr("viewBox", [0, 0, width, height]);
-      const gGrid = svg.append("g");
-
-      // Create a tooltip div
-      const tooltip = d3
+    function setupTooltip() {
+      return d3
         .select("#chart")
         .append("div")
         .style("opacity", 0)
         .attr("class", "tooltip");
+    }
+
+    function plotData(svg, data, x, y, z, tooltip) {
       const gDot = svg
         .append("g")
         .attr("fill", "none")
         .attr("stroke-linecap", "round");
 
-      let tooltipTimeout;
-      let lastHoveredPoint;
-
-      nonReprData = data.filter((d) => d[4] !== 1);
-      reprData = data.filter((d) => d[4] == 1);
-
-      nonRepresentativeDots = gDot
-        .selectAll(".non-representative")
-        .data(nonReprData)
-        .join("path")
-        .classed("non-representative", true)
-        .attr("d", (d) => `M${x(d[0])},${y(d[1])}h0`)
-        .attr("stroke", (d) => z(d[2]));
-      // .attr("stroke-width", z(0.1))
-
-      representativeDots = gDot
-        .selectAll(".representative")
-        .data(reprData)
-        .join("path")
-        .classed("representative", true)
-        .attr("d", (d) => `M${x(d[0])},${y(d[1]) - 0.05}l-0.05,.1h.1z`)
-        .attr("stroke", (d) => d3.color(z(d[2])).brighter(1))
-        .attr("stroke-width", z(0.05))
-        .attr("fill", (d) => d3.color(z(d[2])).brighter(1));
-
+      // Non-representative points as solid dots
       gDot
-        .selectAll(".representative, .non-representative")
-        .on("mouseover", async function (event, d) {
-          if (lastHoveredPoint !== d[3]) {
-            clearTimeout(tooltipTimeout);
-
-            tooltipTimeout = setTimeout(async () => {
-              let tooltipHtml = await fetchUserTooltip(d[3]);
-              tooltip
-                .html(tooltipHtml)
-                .style("left", event.x + "px")
-                .style("top", event.y - 300 + "px");
-              tooltip.transition().duration(100).style("opacity", 0.9);
-            }, 30);
-          }
-          lastHoveredPoint = d[3];
+        .selectAll(".non-representative")
+        .data(data.filter((d) => d[4] !== 1))
+        .join("circle") // Use 'circle' for dots
+        .classed("non-representative", true)
+        .attr("cx", (d) => x(d[0]))
+        .attr("cy", (d) => y(d[1]))
+        .attr("r", 4) // Adjust dot radius as needed
+        .attr("fill", (d) => z(d[2])) // Solid fill
+        .on("click", (event, d) => addUserToComparison(d[3])) // Adjusted for D3 v6
+        .on("mouseover", async (event, d) => {
+          // Adjusted for D3 v6
+          const tooltipHtml = await fetchUserTooltip(d[3]);
+          tooltip
+            .html(tooltipHtml)
+            .style("left", event.pageX + 10 + "px")
+            .style("top", event.pageY + 10 + "px")
+            .transition()
+            .duration(200)
+            .style("opacity", 1);
         })
-        .on("mouseout", function (d) {
-          clearTimeout(tooltipTimeout);
-          tooltip.transition().duration(500).style("opacity", 0);
-          lastHoveredPoint = null;
-        })
-        .on("click", function (event, d) {
-          addCounterfactualPersona(d[3]);
+        .on("mouseout", () => {
+          tooltip.transition().duration(300).style("opacity", 0);
         });
 
-      let hideTooltipTimeout;
+      // Representative points as solid, brighter-colored triangles
+      gDot
+        .selectAll(".representative")
+        .data(data.filter((d) => d[4] === 1))
+        .join("path")
+        .classed("representative", true)
+        .attr("d", (d) => `M ${x(d[0])},${y(d[1]) - 10} l 10,20 -20,0 z`) // Triangle path, adjust size as needed
+        .attr("fill", (d) => d3.color(z(d[2])).brighter(1)) // Ensure brighter fill for representative points
+        .on("click", (event, d) => addUserToComparison(d[3])) // Adjusted for D3 v6
+        .on("mouseover", async (event, d) => {
+          // Adjusted for D3 v6
+          const tooltipHtml = await fetchUserTooltip(d[3]);
+          tooltip
+            .html(tooltipHtml)
+            .style("left", event.pageX + 10 + "px")
+            .style("top", event.pageY + 10 + "px")
+            .transition()
+            .duration(200)
+            .style("opacity", 1);
+        })
+        .on("mouseout", () => {
+          tooltip.transition().duration(300).style("opacity", 0);
+        });
+    }
 
-      $(document).on("mousemove", function (event) {
-        const targetTagName = event.target.tagName.toLowerCase();
+    function setupZoom(svg, x, y, width, height) {
+      const initialZoomScale = 5;
+      const initialTranslate = [
+        (width / 2) * (1 - initialZoomScale),
+        (height / 2) * (1 - initialZoomScale),
+      ];
 
-        if (
-          targetTagName !== "g" &&
-          targetTagName !== "svg" &&
-          targetTagName !== "path"
-        ) {
-          clearTimeout(hideTooltipTimeout);
+      const zoom = d3
+        .zoom()
+        .scaleExtent([1, 40])
+        .on("zoom", (event) => {
+          const transform = event.transform;
+          svg.selectAll("g").attr("transform", transform);
 
-          hideTooltipTimeout = setTimeout(function () {
-            tooltip.transition().duration(500).style("opacity", 0);
-            lastHoveredPoint = null;
-          }, 500);
-        } else {
-          clearTimeout(hideTooltipTimeout);
-        }
-      });
+          // Adjust sizes based on zoom level, with minimum and maximum sizes
+          const minSize = 2; // Minimum size to ensure visibility
+          const maxSize = 6; // Maximum size to prevent overlap
+          const size = Math.max(minSize, Math.min(maxSize, 6 / transform.k)); // Adjust base size and divisor as needed
 
-      const gx = svg.append("g");
+          svg.selectAll(".non-representative").attr("r", size / 8); // Adjust non-representative point size
 
-      const gy = svg.append("g");
+          svg
+            .selectAll(".representative")
+            .attr(
+              "d",
+              (d) =>
+                `M ${x(d[0])},${y(d[1]) - size} l ${size},${size * 2} -${
+                  size * 2
+                },0 z`
+            ); // Adjust representative point size
+        });
 
-      const initial_scale = 10;
-      const initial_translate_x = -x(-0.05) * (initial_scale - 1);
-      const initial_translate_y = -y(0.025) * (initial_scale - 1);
       svg
         .call(zoom)
         .call(
           zoom.transform,
           d3.zoomIdentity
-            .translate(initial_translate_x, initial_translate_y)
-            .scale(initial_scale)
+            .translate(initialTranslate[0], initialTranslate[1])
+            .scale(initialZoomScale)
         );
+    }
 
-      function zoomed({ transform }) {
-        const zx = transform.rescaleX(x).interpolate(d3.interpolateRound);
-        const zy = transform.rescaleY(y).interpolate(d3.interpolateRound);
-        gDot.attr("transform", transform).attr("stroke-width", 5 / transform.k);
-        gx.call(xAxis, zx);
-        gy.call(yAxis, zy);
-        gGrid.call(grid, zx, zy);
-      }
-
-      return Object.assign(svg.node(), {
-        reset() {
-          svg.transition().duration(750).call(zoom.transform, d3.zoomIdentity);
-        },
-      });
-    };
-
-    const chartDiv = d3.select("#chart");
-    const chartSvg = chartDiv.append(() => chart());
-
-    return chart;
+    // Append the chart to the DOM
+    d3.select("#chart").append(() => svg.node());
   }
 
   // modal dialogue box for user profile section
