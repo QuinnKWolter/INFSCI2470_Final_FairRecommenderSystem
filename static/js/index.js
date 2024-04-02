@@ -208,7 +208,17 @@ $(document).ready(function () {
         csrfmiddlewaretoken: $('input[name="csrfmiddlewaretoken"]').val(),
       },
       success: function (json) {
+        // Generate the cluster with the returned data
         generate_cluster(json);
+
+        // Filter the json data to include only those subarrays where the value at index 2 is '1',
+        // then map over the filtered data to extract the user IDs from index 3
+        const userIdsToHighlight = json
+          .filter((subArray) => subArray[2] === 1) // Ensure the value at index 2 is 1
+          .map((subArray) => subArray[3].toString()); // Convert user ID to string if necessary
+
+        // Call the highlightUsers function with the extracted user IDs to highlight specific users
+        highlightUsers(userIdsToHighlight);
       },
       error: function (xhr, errmsg, err) {
         console.log("Error", xhr.status + ": " + xhr.responseText);
@@ -442,7 +452,7 @@ $(document).ready(function () {
       // Non-representative points as solid dots
       gDot
         .selectAll(".non-representative")
-        .data(data.filter((d) => d[4] !== 1))
+        .data(data.filter((d) => d[4] !== "1"))
         .join("circle") // Use 'circle' for dots
         .classed("non-representative", true)
         .attr("cx", (d) => x(d[0]))
@@ -451,47 +461,47 @@ $(document).ready(function () {
         .attr("fill", (d) => z(d[2])) // Solid fill
         .on("click", (event, d) => addUserToComparison(d[3])) // Adjusted for D3 v6
         .on("mouseover", async (event, d) => {
-          // Adjusted for D3 v6
           const tooltipHtml = await fetchUserTooltip(d[3]);
           tooltip
             .html(tooltipHtml)
-            .style("left", event.pageX + 10 + "px")
-            .style("top", event.pageY + 10 + "px")
-            .transition()
-            .duration(200)
-            .style("opacity", 1);
+            .style("opacity", 1)
+            .style("visibility", "visible"); // Ensure tooltip is visible for dimension calculations
+          const svgRect = svg.node().getBoundingClientRect();
+          let leftPos = event.clientX - svgRect.left + 30; // Add a small offset to avoid cursor overlap
+          let topPos = event.clientY - svgRect.top + 10;
+          tooltip.style("left", `${leftPos}px`).style("top", `${topPos}px`);
         })
         .on("mouseout", () => {
-          tooltip.transition().duration(300).style("opacity", 0);
+          tooltip.style("opacity", 0).style("visibility", "hidden"); // Hide tooltip on mouseout
         });
 
       // Representative points as solid, brighter-colored triangles
       gDot
         .selectAll(".representative")
-        .data(data.filter((d) => d[4] === 1))
+        .data(data.filter((d) => d[4] === "1"))
         .join("path")
         .classed("representative", true)
         .attr("d", (d) => `M ${x(d[0])},${y(d[1]) - 10} l 10,20 -20,0 z`) // Triangle path, adjust size as needed
         .attr("fill", (d) => d3.color(z(d[2])).brighter(1)) // Ensure brighter fill for representative points
         .on("click", (event, d) => addUserToComparison(d[3])) // Adjusted for D3 v6
         .on("mouseover", async (event, d) => {
-          // Adjusted for D3 v6
           const tooltipHtml = await fetchUserTooltip(d[3]);
           tooltip
             .html(tooltipHtml)
-            .style("left", event.pageX + 10 + "px")
-            .style("top", event.pageY + 10 + "px")
-            .transition()
-            .duration(200)
-            .style("opacity", 1);
+            .style("opacity", 1)
+            .style("visibility", "visible"); // Ensure tooltip is visible for dimension calculations
+          const svgRect = svg.node().getBoundingClientRect();
+          let leftPos = event.clientX - svgRect.left + 10; // Add a small offset to avoid cursor overlap
+          let topPos = event.clientY - svgRect.top + 10;
+          tooltip.style("left", `${leftPos}px`).style("top", `${topPos}px`);
         })
         .on("mouseout", () => {
-          tooltip.transition().duration(300).style("opacity", 0);
+          tooltip.style("opacity", 0).style("visibility", "hidden"); // Hide tooltip on mouseout
         });
     }
 
     function setupZoom(svg, x, y, width, height) {
-      const initialZoomScale = 5;
+      const initialZoomScale = 7;
       const initialTranslate = [
         (width / 2) * (1 - initialZoomScale),
         (height / 2) * (1 - initialZoomScale),
@@ -505,8 +515,8 @@ $(document).ready(function () {
           svg.selectAll("g").attr("transform", transform);
 
           // Adjust sizes based on zoom level, with minimum and maximum sizes
-          const minSize = 2; // Minimum size to ensure visibility
-          const maxSize = 6; // Maximum size to prevent overlap
+          const minSize = 1; // Minimum size to ensure visibility
+          const maxSize = 4; // Maximum size to prevent overlap
           const size = Math.max(minSize, Math.min(maxSize, 6 / transform.k)); // Adjust base size and divisor as needed
 
           svg.selectAll(".non-representative").attr("r", size / 8); // Adjust non-representative point size
@@ -534,6 +544,17 @@ $(document).ready(function () {
 
     // Append the chart to the DOM
     d3.select("#chart").append(() => svg.node());
+  }
+
+  function highlightUsers(userIds) {
+    console.log(userIds);
+    d3.selectAll(".non-representative, .representative")
+      .style("fill", function (d) {
+        return userIds.includes(d[3]) ? "#ff0000" : "#cccccc"; // Replace 'yourHighlightColor' with your desired color
+      })
+      .style("opacity", function (d) {
+        return userIds.includes(d[3]) ? 1 : 0.5;
+      });
   }
 
   // modal dialogue box for user profile section

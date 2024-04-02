@@ -1,6 +1,7 @@
 import csv, json
 from .models import *
 import random
+import pandas as pd
 
 from django.views.generic import TemplateView
 from django.http import (
@@ -77,10 +78,33 @@ def fetch_user_info(request):
     user = Users.objects.get(userId=int(userId))
     rating_data = []
     cluster_data = [[0, 0, 0, 0, 0]]
+    stereotyping_pos = False
+    stereotyping_neg = False
+    miscalibration = False
 
-    # If extra is 1, fetch ratings and cluster data. Otherwise, just user info.
+    # Load the dataset
+    df = pd.read_csv('df_users_all_bpr.csv')
+
+    # If extra is 1, fetch ratings, cluster data, and additional flags
     if request.POST.get('extra') == '1':
         print("EXTRA!")
+
+        # Find the user row in the DataFrame
+        user_row = df[df['userID'] == int(userId)]
+
+        # Determine the flags for stereotyping_pos, stereotyping_neg, and miscalibration
+        if not user_row.empty:
+            stereotyping_value = user_row['stereotyping'].values[0]
+            error_value = user_row['error'].values[0]
+
+            # Set flags based on the thresholds
+            if stereotyping_value >= 0.091:
+                stereotyping_pos = True
+            if stereotyping_value <= -0.053:
+                stereotyping_neg = True
+            if error_value >= 2.86:
+                miscalibration = True
+
         # Fetch the chronological list of ratings for the user
         ratings = Rating.objects.filter(userId=user).order_by('-timestamp')
         
@@ -105,6 +129,7 @@ def fetch_user_info(request):
                     else:
                         cluster_data.append([row["x"], row["y"], 0, row["user_id"], 0])
     
+    # Update the data dictionary with the new keys
     data = {
         'userId': userId,
         'gender': user.gender,
@@ -113,8 +138,13 @@ def fetch_user_info(request):
         'zipCode': user.zipCode,
         'genreRatings': user.genreRatings,
         'ratings': rating_data,
-        'cluster_data': cluster_data
+        'cluster_data': cluster_data,
+        'stereotyping_pos': stereotyping_pos,
+        'stereotyping_neg': stereotyping_neg,
+        'miscalibration': miscalibration
     }
+
+    print(data)
 
     return HttpResponse(
         json.dumps(data),
